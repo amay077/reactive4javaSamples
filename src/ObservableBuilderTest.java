@@ -1,7 +1,10 @@
 import static org.junit.Assert.*;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +33,7 @@ public class ObservableBuilderTest {
 	 * @see http://d.hatena.ne.jp/okazuki/20111106/1320584830
 	 */
 	@Test
-	public void testTick_bacic() {
+	public void sample_04_Tick_bacic() {
 		// 3秒後から1秒間隔で5回値を発行するIObservable<long>を作成する
 		ObservableBuilder<Long> source = ObservableBuilder.tick(
 			1, 5, 3, TimeUnit.SECONDS);
@@ -64,7 +67,7 @@ public class ObservableBuilderTest {
 	 * @see http://d.hatena.ne.jp/okazuki/20111106/1320584830
 	 */
 	@Test
-	public void testGenerate_bacic() {
+	public void sample_04_Generate_bacic() {
 		
 		ObservableBuilder<Timestamped<Integer>> source = ObservableBuilder.generateTimed(
 				0,  // 0から
@@ -186,6 +189,195 @@ public class ObservableBuilderTest {
 				public void next(Observable<String> value) { 
 					System.out.println("next:" + value);  // ← なぜか NG,Error,Abort でも呼ばれる(Reactive.throwException は呼び出されているのに)
 				}
+
+				@Override
+				public void error(Throwable ex) { System.out.println("error:" + ex.getMessage()); }
+
+				@Override
+				public void finish() { 
+					System.out.println("finish!"); 
+					assertTrue(true);
+				}
+			});
+		} catch (InterruptedException e) {
+			fail(e.getMessage());
+		}
+	}
+	
+	/***
+	 * Sample of ObservableBuilder.buffer()
+	 * 
+	 * @see http://d.hatena.ne.jp/okazuki/20120117/1326804922
+	 */
+	@Test
+	public void sample_16_Min_Max_Ave() {
+		try {
+			ObservableBuilder<Integer> s = ObservableBuilder.range(1, 3);
+
+			// 最大値を求めて表示
+			Reactive.run(
+			    s.<Integer>max()
+			, new Observer<Integer>() {
+				@Override
+				public void next(Integer value) { System.out.println("max:" + value); }
+
+				@Override
+				public void error(Throwable ex) { System.out.println("error:" + ex.getMessage()); }
+
+				@Override
+				public void finish() { 
+					System.out.println("max finish!"); 
+					assertTrue(true);
+				}
+			});
+			
+			// 最小値を求めて表示
+			Reactive.run(
+                s.<Integer>min()
+            , new Observer<Integer>() {
+				@Override
+				public void next(Integer value) { System.out.println("min:" + value); }
+
+				@Override
+				public void error(Throwable ex) { System.out.println("error:" + ex.getMessage()); }
+
+				@Override
+				public void finish() { 
+					System.out.println("min finish!"); 
+					assertTrue(true);
+				}
+			});
+
+			// 平均を求めて表示
+			Reactive.run(
+			    s.averageInt()
+			, new Observer<Double>() {
+				@Override
+				public void next(Double value) { System.out.println("average:" + value); }
+
+				@Override
+				public void error(Throwable ex) { System.out.println("error:" + ex.getMessage()); }
+
+				@Override
+				public void finish() { 
+					System.out.println("average finish!"); 
+					assertTrue(true);
+				}
+			});
+
+		} catch (InterruptedException e) {
+			fail(e.getMessage());
+		}
+	}
+
+
+	/***
+	 * Sample of ObservableBuilder.buffer()
+	 * 
+	 * @see http://d.hatena.ne.jp/okazuki/20120117/1326804922
+	 */
+	@Test
+	public void sample_25_Buffer_bacic() {
+		try {
+			// 購読
+			Reactive.run(
+				// 1～10の値を発行するIObservable<int>のシーケンス
+				ObservableBuilder.range(1, 10)
+				// 3つずつの値に分ける
+				.buffer(3)
+			, new Observer<List<Integer>>() {
+				@Override
+				public void next(List<Integer> l) {
+					// List<int>の内容を出力
+		            System.out.println("-- Buffer start");
+		            for (int i : l)
+		            {
+			            System.out.println(i);
+		            }
+				}
+
+				@Override
+				public void error(Throwable ex) { System.out.println("error:" + ex.getMessage()); }
+
+				@Override
+				public void finish() { 
+					System.out.println("finish!"); 
+					assertTrue(true);
+				}
+			});
+		} catch (InterruptedException e) {
+			fail(e.getMessage());
+		}
+	}
+
+	/***
+	 * Sample of ObservableBuilder.buffer()
+	 * 
+	 * @see http://d.hatena.ne.jp/okazuki/20120117/1326804922
+	 */
+	@Test
+	public void sample_25_Buffer_time() {
+		final DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
+		try {
+			// 購読
+			Reactive.run(
+				// 500msごとに値を発行する
+				ObservableBuilder.tick(500, TimeUnit.MILLISECONDS)
+				// 3秒間値を溜める
+				.buffer(3, TimeUnit.SECONDS)
+				// 最初の3つを後続に流す
+				.take(3)
+			, new Observer<List<Long>>() {
+				@Override
+				public void next(List<Long> l) {
+					// List<int>の内容を出力
+		            System.out.println("-- Buffer " + dateFormat.format(new Date()));
+		            for (long i : l)
+		            {
+			            System.out.println(i);
+		            }
+				}
+
+				@Override
+				public void error(Throwable ex) { System.out.println("error:" + ex.getMessage()); }
+
+				@Override
+				public void finish() { 
+					System.out.println("finish!"); 
+					assertTrue(true);
+				}
+			});
+		} catch (InterruptedException e) {
+			fail(e.getMessage());
+		}
+	}
+
+	/***
+	 * Sample of ObservableBuilder.buffer()
+	 * 
+	 * @see http://d.hatena.ne.jp/okazuki/20120117/1326804922
+	 */
+	@Test
+	public void sample_25_Buffer_combi() {
+		try {
+			// 購読
+			Reactive.run(
+				// 500msごとに値を発行する
+				ObservableBuilder.tick(500, TimeUnit.MILLISECONDS)
+				// 3秒間値を溜める
+				.buffer(3, TimeUnit.SECONDS)
+				// 最初の3つを後続に流す
+				.take(3)
+				.selectMany(new Func1<List<Long>, Observable<? extends Long>>() {
+					@Override
+					public Observable<? extends Long> invoke(List<Long> l) {
+						return ObservableBuilder.from(l);
+					}
+				})
+				.<Long>max()
+			, new Observer<Long>() {
+				@Override
+				public void next(Long l) { System.out.println("next:" + l); }
 
 				@Override
 				public void error(Throwable ex) { System.out.println("error:" + ex.getMessage()); }
