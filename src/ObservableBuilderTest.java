@@ -1,5 +1,7 @@
 import static org.junit.Assert.*;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.AbstractMap.SimpleEntry;
@@ -9,11 +11,13 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import javax.xml.crypto.dsig.keyinfo.KeyValue;
 
 import hu.akarnokd.reactive4java.base.Action0;
+import hu.akarnokd.reactive4java.base.Func0;
 import hu.akarnokd.reactive4java.base.Func1;
 import hu.akarnokd.reactive4java.base.Func2;
 import hu.akarnokd.reactive4java.query.ObservableBuilder;
@@ -33,7 +37,7 @@ public class ObservableBuilderTest {
 	 * @see http://d.hatena.ne.jp/okazuki/20111106/1320584830
 	 */
 	@Test
-	public void sample_04_Tick_bacic() {
+	public void sample_04a_tick() {
 		// 3秒後から1秒間隔で5回値を発行するIObservable<long>を作成する
 		ObservableBuilder<Long> source = ObservableBuilder.tick(
 			1, 5, 3, TimeUnit.SECONDS);
@@ -67,7 +71,7 @@ public class ObservableBuilderTest {
 	 * @see http://d.hatena.ne.jp/okazuki/20111106/1320584830
 	 */
 	@Test
-	public void sample_04_Generate_bacic() {
+	public void sample_04b_generate() {
 		
 		ObservableBuilder<Timestamped<Integer>> source = ObservableBuilder.generateTimed(
 				0,  // 0から
@@ -119,12 +123,184 @@ public class ObservableBuilderTest {
 	}
 	
 	/***
+	 * Sample of cold observable
+	 * 
+	 * @see http://d.hatena.ne.jp/okazuki/20111107/1320677760
+	 */
+	@Test
+	public void sample_05a_hot_cold() {
+		final DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss.SSS");
+		final CountDownLatch latch = new CountDownLatch(2);
+
+		// 1秒間隔で値を発行するIObservable<long>を作成する
+		ObservableBuilder<Long> source = ObservableBuilder.tick(
+				 1, 10, 1, 
+				 TimeUnit.SECONDS);
+		// 購読
+		Closeable registered1 = source.register(new Observer<Long>() {
+			@Override
+			public void next(Long value) {
+				System.out.println(dateFormat.format(new Date()) + " 1##next:" + value); 
+			}
+
+			@Override
+			public void error(Throwable ex) {
+				System.out.println(dateFormat.format(new Date()) + " 1##error:" + ex.getMessage()); 
+			}
+
+			@Override
+			public void finish() { 
+				System.out.println(dateFormat.format(new Date()) + " 1##finish!"); 
+				latch.countDown();
+			}
+		});
+		
+		// 3秒後にもう一度購読
+		try {
+			Thread.sleep(3000);
+		} catch (InterruptedException e) {
+			fail(e.getMessage());
+		}
+		
+		// 購読
+		Closeable registered2 = source.register(new Observer<Long>() {
+			@Override
+			public void next(Long value) {
+				System.out.println(dateFormat.format(new Date()) + " 2##next:" + value); 
+			}
+
+			@Override
+			public void error(Throwable ex) {
+				System.out.println(dateFormat.format(new Date()) + " 2##error:" + ex.getMessage()); 
+			}
+
+			@Override
+			public void finish() { 
+				System.out.println(dateFormat.format(new Date()) + " 2##finish!"); 
+				latch.countDown();
+			}
+		});
+	
+		try {
+			latch.await(30, TimeUnit.SECONDS);
+			registered1.close();
+			registered2.close();
+			assertTrue(true);
+		} catch (Exception e) {
+			fail(e.getMessage());
+		}
+	}
+	
+	/***
+	 * Sample of hot observable
+	 * 
+	 * @see http://d.hatena.ne.jp/okazuki/20111107/1320677760
+	 */
+	@Test
+	public void sample_05b_hot_hot() {
+		System.out.println("reactive4java not implement FromEvent()");
+	}
+	
+	/***
+	 * Sample of hot observable generators
+	 * 
+	 * @see http://d.hatena.ne.jp/okazuki/20111109/1320849106
+	 */
+	@Test
+	public void sample_06b_start() {
+		// バックグラウンドで処理を開始
+		Observable<Integer> source = Reactive.start(new Func0<Integer>() {
+			@Override
+			public Integer invoke() {
+				System.out.println("background task start.");
+				try {
+					Thread.sleep(2000);
+				} catch (InterruptedException e) {
+					fail(e.getMessage());
+				}
+				System.out.println("background task end.");
+				return 1;
+			}
+		});
+		
+		// 購読
+		System.out.println("subscribe1");
+		Closeable subscription1 = source.register(new Observer<Integer>() {
+			@Override
+			public void next(Integer value) {
+				System.out.println("1##next:" + value); 
+			}
+
+			@Override
+			public void error(Throwable ex) {
+				System.out.println("1##error:" + ex.getMessage()); 
+			}
+
+			@Override
+			public void finish() { 
+				System.out.println("1##finish!"); 
+			}
+		});
+		
+		// 処理が確実に終わるように5秒待つ
+		System.out.println("sleep 5sec.");
+		try {
+			Thread.sleep(5000);
+		} catch (InterruptedException e) {
+			fail(e.getMessage());
+		}
+		
+		// Observableが発行する値の購読を停止
+		System.out.println("dispose method call.");
+		try {
+			subscription1.close();
+		} catch (IOException e) {
+			fail(e.getMessage());
+		}
+		
+		// 購読
+		System.out.println("subscribe2");
+		Closeable subscription2 = source.register(new Observer<Integer>() {
+			@Override
+			public void next(Integer value) {
+				System.out.println("2##next:" + value); 
+			}
+
+			@Override
+			public void error(Throwable ex) {
+				System.out.println("2##error:" + ex.getMessage()); 
+			}
+
+			@Override
+			public void finish() { 
+				System.out.println("2##finish!"); 
+			}
+		});
+		try {
+			Thread.sleep(3000);
+			subscription2.close();
+		} catch (Exception e) {
+			fail(e.getMessage());
+		}
+	}
+	
+	/***
+	 * Sample of hot observable generators
+	 * 
+	 * @see http://d.hatena.ne.jp/okazuki/20111109/1320849106
+	 */
+	@Test
+	public void sample_06c_toAsync() {
+		System.out.println("reactive4java not implement ToAsync()");
+	}
+
+	/***
 	 * Sample of ObservableBuilder.resumeAlways()
 	 * 
 	 * @see http://d.hatena.ne.jp/okazuki/20120211/1328973285
 	 */
 	@Test
-	public void testResumeAlways_bacic() {
+	public void sample_34a_resumeAlways_basic() {
 		ArrayList<Observable<String>> resumeObservables = new ArrayList<Observable<String>>();
 		resumeObservables.add(Reactive.singleton("OK"));
 		
@@ -160,7 +336,7 @@ public class ObservableBuilderTest {
 	 * @see http://d.hatena.ne.jp/okazuki/20120211/1328973285
 	 */
 	@Test
-	public void testResumeAlways_resume() {
+	public void sample_34b_resumeAlways_resuming() {
 		List<Observable<Observable<String>>> empty = new ArrayList<Observable<Observable<String>>>();
 
 		try {
@@ -210,7 +386,7 @@ public class ObservableBuilderTest {
 	 * @see http://d.hatena.ne.jp/okazuki/20120117/1326804922
 	 */
 	@Test
-	public void sample_16_Min_Max_Ave() {
+	public void sample_16_min_max_ave() {
 		try {
 			ObservableBuilder<Integer> s = ObservableBuilder.range(1, 3);
 
@@ -277,7 +453,7 @@ public class ObservableBuilderTest {
 	 * @see http://d.hatena.ne.jp/okazuki/20120117/1326804922
 	 */
 	@Test
-	public void sample_25_Buffer_bacic() {
+	public void sample_25a_buffer_count() {
 		try {
 			// 購読
 			Reactive.run(
@@ -316,7 +492,7 @@ public class ObservableBuilderTest {
 	 * @see http://d.hatena.ne.jp/okazuki/20120117/1326804922
 	 */
 	@Test
-	public void sample_25_Buffer_time() {
+	public void sample_25b_buffer_time() {
 		final DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
 		try {
 			// 購読
@@ -358,7 +534,7 @@ public class ObservableBuilderTest {
 	 * @see http://d.hatena.ne.jp/okazuki/20120117/1326804922
 	 */
 	@Test
-	public void sample_25_Buffer_combi() {
+	public void sample_25c_buffer_combination() {
 		try {
 			// 購読
 			Reactive.run(
