@@ -12,6 +12,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.AbstractMap.SimpleEntry;
+import java.util.concurrent.TimeUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -149,4 +150,13 @@ public class MyReactiveTest {
 		assertEquals("ccc", actualList.get(2).getValue());
 	}
 
+	@Test
+	public void testWindow() throws InterruptedException {
+		Reactive.run(
+		ObservableBuilder.tick(1, TimeUnit.SECONDS)
+		.window(5, TimeUnit.SECONDS)
+		.take(1)
+		.first()
+		, Reactive.println());
+	}
 }
