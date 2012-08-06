@@ -74,7 +74,7 @@ public class MyReactiveTest {
 	 * @throws InterruptedException 
 	 */
 	@Test
-	public void testGenerateByRelayedArray1() throws InterruptedException {
+	public void testAppendIndexToArray1() throws InterruptedException {
 		
 		List<String> list = Arrays.asList("aaa", "bbb", "ccc");
 		final List<SimpleEntry<Integer, String>> actualList = new ArrayList<SimpleEntry<Integer,String>>();
@@ -116,7 +116,7 @@ public class MyReactiveTest {
 	 * @throws InterruptedException 
 	 */
 	@Test
-	public void testGenerateByRelayedArray2() throws InterruptedException {
+	public void testAppendIndexToArray2() throws InterruptedException {
 		
 		List<String> list = Arrays.asList("aaa", "bbb", "ccc");
 		final List<SimpleEntry<Integer, String>> actualList = new ArrayList<SimpleEntry<Integer,String>>();
