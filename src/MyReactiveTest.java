@@ -153,10 +153,16 @@ public class MyReactiveTest {
 	@Test
 	public void testWindow() throws InterruptedException {
 		Reactive.run(
-		ObservableBuilder.tick(1, TimeUnit.SECONDS)
-		.window(5, TimeUnit.SECONDS)
-		.take(1)
-		.first()
+//		ObservableBuilder.tick(1, TimeUnit.SECONDS)
+		ObservableBuilder.range(1, 10)
+		.window(3)
+		.take(3)
+		.selectMany(new Func1<Observable<Integer>, Observable<? extends Integer>>() {
+			@Override
+			public Observable<? extends Integer> invoke(Observable<Integer> o) {
+				return o;
+			}
+		})
 		, Reactive.println());
 	}
 }
