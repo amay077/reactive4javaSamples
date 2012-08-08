@@ -156,13 +156,35 @@ public class MyReactiveTest {
 //		ObservableBuilder.tick(1, TimeUnit.SECONDS)
 		ObservableBuilder.range(1, 10)
 		.window(3)
-		.take(3)
+		.take(1)
 		.selectMany(new Func1<Observable<Integer>, Observable<? extends Integer>>() {
 			@Override
 			public Observable<? extends Integer> invoke(Observable<Integer> o) {
 				return o;
 			}
 		})
+		, Reactive.println());
+	}
+
+	@Test
+	public void testBuffer() throws InterruptedException {
+		Reactive.run(
+		ObservableBuilder.tick(1, TimeUnit.SECONDS)
+//		ObservableBuilder.range(1, 10)
+		.buffer(3)
+		.takeWhile(new Func1<List<Long>, Boolean>() {
+			@Override
+			public Boolean invoke(List<Long> param1) {
+				return param1.get(0) < 9;
+			}
+		})
+//		.take(3)
+//		.selectMany(new Func1<Observable<Integer>, Observable<? extends Integer>>() {
+//			@Override
+//			public Observable<? extends Integer> invoke(Observable<Integer> o) {
+//				return o;
+//			}
+//		})
 		, Reactive.println());
 	}
 }
