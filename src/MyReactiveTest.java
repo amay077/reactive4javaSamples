@@ -160,7 +160,7 @@ public class MyReactiveTest {
 		.selectMany(new Func1<Observable<Integer>, Observable<? extends Integer>>() {
 			@Override
 			public Observable<? extends Integer> invoke(Observable<Integer> o) {
-				return o;
+				return Reactive.singleton(1);
 			}
 		})
 		, Reactive.println());
@@ -172,19 +172,43 @@ public class MyReactiveTest {
 		ObservableBuilder.tick(1, TimeUnit.SECONDS)
 //		ObservableBuilder.range(1, 10)
 		.buffer(3)
-		.takeWhile(new Func1<List<Long>, Boolean>() {
-			@Override
-			public Boolean invoke(List<Long> param1) {
-				return param1.get(0) < 9;
-			}
-		})
-//		.take(3)
-//		.selectMany(new Func1<Observable<Integer>, Observable<? extends Integer>>() {
+//		.takeWhile(new Func1<List<Long>, Boolean>() {
 //			@Override
-//			public Observable<? extends Integer> invoke(Observable<Integer> o) {
-//				return o;
+//			public Boolean invoke(List<Long> param1) {
+//				return param1.get(0) < 9;
 //			}
 //		})
+		.take(1)
+//		.selectMany(new Func1<List<Long>, Observable<? extends Long>>() {
+//			@Override
+//			public Observable<? extends Long> invoke(List<Long> o) {
+//				return ObservableBuilder.from(o);
+//			}
+//		})
+		.select(new Func1<List<Long>, Long>() {
+			@Override
+			public Long invoke(List<Long> l) {
+				return l.get(l.size() - 1);
+			}
+		})
 		, Reactive.println());
+	}
+	
+	@Test
+	public void testTake_nested() throws InterruptedException {
+		Reactive.run(
+		ObservableBuilder.tick(1, TimeUnit.SECONDS)
+		.buffer(3)
+		.take(1)
+		.select(new Func1<List<Long>, Long>() {
+			@Override
+			public Long invoke(List<Long> l) {
+				return l.get(l.size() - 1);
+			}
+		})
+		.buffer(3)
+		.take(1)
+		, Reactive.println());
+		
 	}
 }
