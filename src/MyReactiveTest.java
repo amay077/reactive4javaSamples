@@ -2,7 +2,6 @@ import static org.junit.Assert.*;
 import hu.akarnokd.reactive4java.base.Action1;
 import hu.akarnokd.reactive4java.base.Func1;
 import hu.akarnokd.reactive4java.base.Option;
-import hu.akarnokd.reactive4java.query.IterableBuilder;
 import hu.akarnokd.reactive4java.query.ObservableBuilder;
 import hu.akarnokd.reactive4java.reactive.Observable;
 import hu.akarnokd.reactive4java.reactive.Observer;
@@ -10,12 +9,14 @@ import hu.akarnokd.reactive4java.reactive.Reactive;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.AbstractMap.SimpleEntry;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 import org.junit.Test;
@@ -210,5 +211,96 @@ public class MyReactiveTest {
 		.take(1)
 		, Reactive.println());
 		
+	}
+
+	/**
+	 * buffer で Closeable.close が呼ばれることのテスト 
+	 */
+	@Test
+	public void testCloseByBuffer() throws InterruptedException {
+		final List<Object> expected = new ArrayList<Object>();
+
+		Observable<Integer> source1 = Reactive.createWithCloseable(
+				new Func1<Observer<? super Integer>, Closeable>() {
+			@Override
+			public Closeable invoke(final Observer<? super Integer> observer) {
+				final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+				final AtomicInteger number = new AtomicInteger();
+				executor.scheduleAtFixedRate(new Runnable() {
+					@Override
+					public void run() {
+						System.out.println("timer1.ticked");
+						observer.next(number.incrementAndGet());
+					}
+				}, 1, 1, TimeUnit.SECONDS);
+				
+				return new Closeable() {
+					@Override
+					public void close() throws IOException {
+						System.out.println("timer1-close() called.");
+						expected.add("timer1-close");
+						
+						executor.shutdown();
+						observer.finish();
+					}
+				};
+			}
+		});
+
+		final Observable<Integer> source2 = Reactive.createWithCloseable(
+				new Func1<Observer<? super Integer>, Closeable>() {
+			@Override
+			public Closeable invoke(final Observer<? super Integer> observer) {
+				final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+				final AtomicInteger number = new AtomicInteger(10);
+				executor.scheduleAtFixedRate(new Runnable() {
+					@Override
+					public void run() {
+						System.out.println("timer2.ticked");
+						observer.next(number.incrementAndGet());
+					}
+				}, 1, 1, TimeUnit.SECONDS);
+				
+				return new Closeable() {
+					@Override
+					public void close() throws IOException {
+						System.out.println("timer2-close() called.");
+						expected.add("timer2-close");
+						executor.shutdown();
+						observer.finish();
+					}
+				};
+			}
+		});
+
+		Reactive.run(
+			ObservableBuilder.from(source1)
+			.buffer(3) // 3つためる
+			.take(1) // 1回だけ取る
+			.invoke(new Action1<List<Integer>>() {
+				@Override
+				public void invoke(List<Integer> value) {
+					System.out.println("timer1-take(1) called.");
+					expected.add(value);
+				}
+			})
+			.selectMany(source2)
+			.buffer(3) // 3つためる
+			.take(1) // 1回だけ取る
+			.invoke(new Action1<List<Integer>>() {
+				@Override
+				public void invoke(List<Integer> value) {
+					System.out.println("timer2-take(1) called.");
+					expected.add(value);
+				}
+			}));
+
+		// verification
+		Iterator<Object> iterator = expected.iterator();
+		assertEquals(iterator.next(), Arrays.asList(1, 2, 3));
+		assertEquals(iterator.next(), "timer1-close");
+		assertEquals(iterator.next(), Arrays.asList(11, 12, 13));
+		assertEquals(iterator.next(), "timer2-close");
+		assertFalse(iterator.hasNext());
 	}
 }
