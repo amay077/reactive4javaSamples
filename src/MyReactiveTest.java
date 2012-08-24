@@ -287,13 +287,13 @@ public class MyReactiveTest {
 			.selectMany(source2)
 			.buffer(3) // 3つためる
 			.take(1) // 1回だけ取る
-			.invoke(new Action1<List<Integer>>() {
-				@Override
-				public void invoke(List<Integer> value) {
-					System.out.println("timer2-take(1) called.");
-					expected.add(value);
-				}
-			}));
+		, Reactive.asObserver(new Action1<Option<List<Integer>>>() {
+			@Override
+			public void invoke(Option<List<Integer>> value) {
+				System.out.println("timer2-take(1) called.");
+				expected.add(value.value());
+			}
+		}));
 
 		// verification
 		Iterator<Object> iterator = expected.iterator();
@@ -301,6 +301,48 @@ public class MyReactiveTest {
 		assertEquals(iterator.next(), "timer1-close");
 		assertEquals(iterator.next(), Arrays.asList(11, 12, 13));
 		assertEquals(iterator.next(), "timer2-close");
+		assertFalse(iterator.hasNext());
+	}
+	
+	@Test
+	public void testResumeAlways() throws InterruptedException {
+		final List<Object> expected = new ArrayList<Object>();
+
+		Observable<Integer> source = Reactive.createWithCloseable(
+				new Func1<Observer<? super Integer>, Closeable>() {
+			@Override
+			public Closeable invoke(final Observer<? super Integer> observer) {
+				
+				observer.next(1);
+				
+				return new Closeable() {
+					@Override
+					public void close() throws IOException {
+						System.out.println("source-close() called.");
+						observer.finish();
+					}
+				};
+			}
+		});
+
+		List<Observable<Integer>> list = Arrays.asList(Reactive.singleton(2));
+		Reactive.run(
+		ObservableBuilder.from(source)
+		.timeout(3, TimeUnit.SECONDS)
+		.resumeAlways(list)
+		, Reactive.asObserver(new Action1<Option<Integer>>() {
+			@Override
+			public void invoke(Option<Integer> value) {
+				System.out.println("invoked:" + value.value());
+				expected.add(value.value());
+			}
+		})
+		);
+
+		// verification
+		Iterator<Object> iterator = expected.iterator();
+		assertEquals(iterator.next(), 1);
+		assertEquals(iterator.next(), 2);
 		assertFalse(iterator.hasNext());
 	}
 }
